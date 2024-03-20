@@ -1,8 +1,27 @@
 import streamlit as st
+import extra_streamlit_components as stx
+from streamlit_extras.annotated_text import annotated_text
 
 from stella_fortune import Stella
-
 stl = Stella()
+
+
+@st.cache_resource(experimental_allow_widgets=True)
+def get_manager():
+    return stx.CookieManager()
+
+
+def show_annotated_text(prefix, pref, bloodtype, zodiac, suffix):
+    annotated_text(
+        prefix,
+        (pref, "", '#ffad60'),
+        " x ",
+        (bloodtype, "", '#d9534f'),
+        " x ",
+        (zodiac, "", '#96ceb4'),
+        suffix,
+    )
+
 
 ### ページ設定
 st.set_page_config(
@@ -11,23 +30,29 @@ st.set_page_config(
     layout="centered"
 )
 
-st.title('ステラちゃん占い')
-st.subheader('出身地×血液型×星座 = 2,256通りの占い')
+st.header('🔮ステラちゃん占い')
+show_annotated_text('', '出身地', '血液型', '星座', ' = 2,256通りの占い')
 
 tab1, tab2 = st.tabs(["ランキング", "検索"])
 
+# ランキング
 with tab1:
     st.write(f"今日の運勢ランキング")
 
     rank_table = stl.get_rank_table()
-    for i, (p, b, z) in enumerate(rank_table[:10]):
-        st.write(f"{i+1}位  {p} x {b} x {z}")
+    for i, (p, b, z) in enumerate(rank_table[:20]):
+        show_annotated_text(f"　{i+1:>2d}位 ", p, b, z, '')
 
+# 検索
 with tab2:
     # デフォルト値
-    ip = st.session_state.get('pref', None)
-    ib = st.session_state.get('bloodtype', None)
-    iz = st.session_state.get('zodiac', None)
+    cookie_manager = get_manager()
+    try:
+        ip = stl.pref_list.index(cookie_manager.get(cookie='pref'))
+        ib = stl.bloodtype_list.index(cookie_manager.get(cookie='bloodtype'))
+        iz = stl.zodiac_list.index(cookie_manager.get(cookie='zodiac'))
+    except:
+        ip, ib, iz = [None] * 3
 
     # 入力
     pref = st.selectbox('出身地:', stl.pref_list, index=ip)
@@ -36,13 +61,13 @@ with tab2:
 
     if pref and bloodtype and zodiac:
         # 入力の保存
-        st.session_state['pref'] = stl.pref_list.index(pref)
-        st.session_state['bloodtype'] = stl.bloodtype_list.index(bloodtype)
-        st.session_state['zodiac'] = stl.zodiac_list.index(zodiac)
+        cookie_manager.set('pref', pref, max_age=14*24*60*60, key=0)
+        cookie_manager.set('bloodtype', bloodtype, max_age=14*24*60*60, key=1)
+        cookie_manager.set('zodiac', zodiac, max_age=14*24*60*60, key=2)
 
         # 表示
         rank = stl.get_rank(pref, bloodtype, zodiac)
-        st.write(f"今日の {pref} x {bloodtype} x {zodiac} の運勢")
-        st.write(f"{rank:,} / 2,256 位")
+        show_annotated_text(f"今日の ", pref, bloodtype, zodiac, ' の運勢')
+        st.metric('2,256 位中', f"{rank:,} 位")
 
 
