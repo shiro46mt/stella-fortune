@@ -1,7 +1,11 @@
+from datetime import datetime, timedelta, timezone
+import math
+
 import streamlit as st
 import extra_streamlit_components as stx
 from streamlit_extras.annotated_text import annotated_text
 
+import const
 from stella_fortune import Stella
 stl = Stella()
 
@@ -11,14 +15,30 @@ def get_manager():
     return stx.CookieManager()
 
 
+@st.cache_data
+def get_rank_table(date):
+    return stl.get_rank_table(date)
+
+
+# タイムゾーンの生成
+JST = timezone(timedelta(hours=+9), 'JST')
+date = datetime.now(JST)
+rank_table = stl.get_rank_table(date)
+
+
+def get_rank(pref, bloodtype, zodiac):
+    rank = rank_table.index((pref, bloodtype, zodiac)) + 1
+    return rank
+
+
 def show_annotated_text(prefix, pref, bloodtype, zodiac, suffix):
     annotated_text(
         prefix,
-        (pref, "", '#ffad60'),
+        (pref, "", '#428D5F'),
         " x ",
-        (bloodtype, "", '#d9534f'),
+        (bloodtype, "", '#A95450'),
         " x ",
-        (zodiac, "", '#96ceb4'),
+        (zodiac, "", '#A99A50'),
         suffix,
     )
 
@@ -29,19 +49,61 @@ st.set_page_config(
     page_icon="🔮",
     layout="centered"
 )
+st.markdown(const.HIDE_ST_STYLE, unsafe_allow_html=True)
 
 st.header('🔮ステラちゃん占い')
-show_annotated_text('', '出身地', '血液型', '星座', ' = 2,256通りの占い')
+show_annotated_text('', '出身地', '血液型', '星座', ' = 2256通りの占い')
 
 tab1, tab2 = st.tabs(["ランキング", "検索"])
 
 # ランキング
 with tab1:
-    st.write(f"今日の運勢ランキング")
+    st.write(f"{date.strftime('%Y.%m.%d')} の運勢")
 
-    rank_table = stl.get_rank_table()
-    for i, (p, b, z) in enumerate(rank_table[:20]):
-        show_annotated_text(f"　{i+1:>2d}位 ", p, b, z, '')
+    rows_per_page = 20
+    total_pages = math.ceil(len(rank_table) / rows_per_page)
+
+    # ランキング表示
+    if 'page' not in st.session_state:
+        st.session_state['page'] = 1
+
+    l = (st.session_state['page'] - 1) * rows_per_page
+    r = min(l + rows_per_page, len(rank_table))
+    for i, (p, b, z) in enumerate(rank_table[l:r]):
+        show_annotated_text(f"　{l+i+1:>2d}位 ", p, b, z, '')
+
+    # pagination
+    cols = st.columns([1, 1, 3, 1, 1], gap='small')
+
+    # ページ数の増減ボタン
+    with cols[1]:
+        def minus_one_page():
+            st.session_state['page'] -= 1
+        if st.session_state['page'] > 1:
+            st.button(label='＜', on_click=minus_one_page)
+
+    with cols[3]:
+        def plus_one_page():
+            st.session_state['page'] += 1
+        if st.session_state['page'] < total_pages:
+            st.button(label='＞', on_click=plus_one_page)
+
+    # ページ数の増減ボタン
+    with cols[0]:
+        def first_page():
+            st.session_state['page'] = 1
+        if st.session_state['page'] > 1:
+            st.button(label='≪', on_click=first_page)
+
+    with cols[4]:
+        def last_page():
+            st.session_state['page'] = total_pages
+        if st.session_state['page'] < total_pages:
+            st.button(label='≫', on_click=last_page)
+
+    # 現在のページ番号
+    with cols[2]:
+        st.write(f"{l+1} - {r}位 / {len(rank_table)}位")
 
 # 検索
 with tab2:
@@ -66,8 +128,10 @@ with tab2:
         cookie_manager.set('zodiac', zodiac, max_age=14*24*60*60, key=2)
 
         # 表示
-        rank = stl.get_rank(pref, bloodtype, zodiac)
+        rank = get_rank(pref, bloodtype, zodiac)
         show_annotated_text(f"今日の ", pref, bloodtype, zodiac, ' の運勢')
-        st.metric('2,256 位中', f"{rank:,} 位")
+        st.metric('2256 位中', f"{rank} 位")
+        if rank <= 10:
+            st.balloons()
 
 

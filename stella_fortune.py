@@ -22,20 +22,22 @@ class Stella:
     ]
 
 
-    def get_rank(self, pref, bloodtype, zodiac, day=0):
+    def get_rank(self, pref, bloodtype, zodiac, date=None):
         assert pref in self.pref_list
         assert bloodtype in self.bloodtype_list
         assert zodiac in self.zodiac_list
 
-        rank_table = self.get_rank_table(day)
+        rank_table = self.get_rank_table(date)
         rank = rank_table.index((pref, bloodtype, zodiac)) + 1
 
         return rank
 
 
-    def get_rank_table(self, day=0):
+    def get_rank_table(self, date=None):
         # 日ごとの運勢のため、日付8桁表記を乱数のシードとする
-        seed = (datetime.now(JST) + timedelta(days=day)).strftime('%Y%m%d')
+        if date is None:
+            date = datetime.now(JST)
+        seed = date.strftime('%Y%m%d')
         random.seed(seed)
 
         rank_list = list(product(self.pref_list, self.bloodtype_list, self.zodiac_list))
